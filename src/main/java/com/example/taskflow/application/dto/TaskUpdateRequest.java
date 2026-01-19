@@ -1,0 +1,23 @@
+package com.example.taskflow.application.dto;
+
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class TaskUpdateRequest {
+
+    @Size(max = 120)
+    private String title;
+
+    @Size(max = 2000)
+    private String explain;
+
+    private Boolean isCompleted;
+    private Boolean isDeleted;
+
+    private Long startDate;
+    private Long endDate;
+    private Long date;
+
+    private Integer version;
+}
