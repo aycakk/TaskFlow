@@ -6,6 +6,8 @@ import com.example.taskflow.application.dto.TaskUpdateRequest;
 import com.example.taskflow.infrastructure.persistence.entity.TaskEntity;
 import com.example.taskflow.infrastructure.persistence.repository.TaskRepository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,32 +22,48 @@ public class TaskService {
     public TaskService(TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
     }
+    @Transactional(readOnly = true)
+    public Page<TaskResponse> listByUserPaged(Long userId,
+                                              boolean includeDeleted,
+                                              int page,
+                                              int size) {
+
+        PageRequest pageable = PageRequest.of(page, size);
+
+        Page<TaskEntity> entityPage = includeDeleted
+                ? taskRepository.findAllByUserId(userId, pageable)
+                : taskRepository.findActiveTasks(userId, pageable);
+
+        return entityPage.map(this::toResponse);
+    }
+
 
     public TaskResponse create(TaskCreateRequest request) {
         TaskEntity entity = new TaskEntity();
+
         entity.setUserId(request.getUserId());
         entity.setTitle(request.getTitle() == null ? "" : request.getTitle());
         entity.setExplain(request.getExplain() == null ? "" : request.getExplain());
 
-        entity.setIsCompleted(request.getIsCompleted() != null && request.getIsCompleted());
-        entity.setIsDeleted(request.getIsDeleted()); // nullable kalsın
-
         entity.setStartDate(request.getStartDate() == null ? 0L : request.getStartDate());
         entity.setEndDate(request.getEndDate() == null ? 0L : request.getEndDate());
 
-        // date null gelirse entity @PrePersist now basacak;
-        entity.setDate(request.getDate());
+        // ✅ client göndermese de backend default
+        entity.setIsCompleted(false);
+        entity.setIsDeleted(false);
 
-        // version/createdTime/updatedTime/id -> @PrePersist
+         entity.setDate(System.currentTimeMillis());
+
         TaskEntity saved = taskRepository.save(entity);
         return toResponse(saved);
     }
+
 
     @Transactional(readOnly = true)
     public List<TaskResponse> listByUser(Long userId, boolean includeDeleted) {
         List<TaskEntity> list = includeDeleted
                 ? taskRepository.findAllByUserId(userId)
-                : taskRepository.findAllByUserIdAndIsDeletedFalse(userId);
+                : taskRepository.findActiveTasks(userId); // ✅ null/false güvenli
 
         return list.stream().map(this::toResponse).toList();
     }
@@ -59,14 +77,14 @@ public class TaskService {
         if (request.getExplain() != null) entity.setExplain(request.getExplain());
 
         if (request.getIsCompleted() != null) entity.setIsCompleted(request.getIsCompleted());
-        if (request.getIsDeleted() != null) entity.setIsDeleted(request.getIsDeleted());
+
 
         if (request.getStartDate() != null) entity.setStartDate(request.getStartDate());
         if (request.getEndDate() != null) entity.setEndDate(request.getEndDate());
         if (request.getDate() != null) entity.setDate(request.getDate());
 
-        //  version otomatik artmıyor.
-        // Eğer client version gönderiyorsa ve
+        // Orta yol: version otomatik artmıyor.
+
         if (request.getVersion() != null) {
             entity.setVersion(request.getVersion());
         }

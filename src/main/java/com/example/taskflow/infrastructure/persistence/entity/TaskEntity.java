@@ -39,8 +39,9 @@ public class TaskEntity {
     @Column(name = "is_complete", nullable = false)
     private Boolean isCompleted = false;
 
-    @Column(name = "is_deleted")
-    private Boolean isDeleted;
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
 
     @Column(name = "start_time", nullable = false)
     private Long startDate = 0L;
@@ -66,6 +67,8 @@ public class TaskEntity {
     @PrePersist
     void prePersist() {
         long now = System.currentTimeMillis();
+        if (this.isDeleted == null) this.isDeleted = false;
+
 
         if (this.id == null || this.id.isBlank()) {
             this.id = UUID.randomUUID().toString();

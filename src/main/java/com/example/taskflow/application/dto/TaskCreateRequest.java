@@ -19,10 +19,9 @@ public class TaskCreateRequest {
     @Size(max = 2000)
     private String explain;
 
-    private Boolean isCompleted;
-    private Boolean isDeleted;
+
 
     private Long startDate;
     private Long endDate;
-    private Long date;
+
 }

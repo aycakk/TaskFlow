@@ -7,6 +7,7 @@ import com.example.taskflow.application.service.TaskService;
 
 import jakarta.validation.Valid;
 
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +39,15 @@ public class TaskController {
     ) {
         return taskService.listByUser(userId, includeDeleted);
     }
+    @GetMapping("/paged")
+    public Page<TaskResponse> listPaged(
+            @RequestParam Long userId,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return taskService.listByUserPaged(userId, includeDeleted, page, size);
+    }
 
     // UPDATE (patch gibi çalışıyor)
     @PutMapping("/{id}")
@@ -45,6 +55,13 @@ public class TaskController {
                                @Valid @RequestBody TaskUpdateRequest request) {
         return taskService.update(id, request);
     }
+    @PatchMapping("/{id}")
+    public TaskResponse patchUpdate(@PathVariable String id,
+                                    @RequestBody TaskUpdateRequest request) {
+        return taskService.update(id, request);
+    }
+
+
 
     // SOFT DELETE
     @DeleteMapping("/{id}")
