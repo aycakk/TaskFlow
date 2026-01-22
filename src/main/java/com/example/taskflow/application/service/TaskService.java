@@ -11,7 +11,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.util.List;import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 
 @Service
 @Transactional
@@ -22,6 +24,7 @@ public class TaskService {
     public TaskService(TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
     }
+
     @Transactional(readOnly = true)
     public Page<TaskResponse> listByUserPaged(Long userId,
                                               boolean includeDeleted,
@@ -37,11 +40,11 @@ public class TaskService {
         return entityPage.map(this::toResponse);
     }
 
-
-    public TaskResponse create(TaskCreateRequest request) {
+    // ✅ DEĞİŞTİ: userId artık request'ten değil, parametreden geliyor
+    public TaskResponse create(Long userId, TaskCreateRequest request) {
         TaskEntity entity = new TaskEntity();
 
-        entity.setUserId(request.getUserId());
+        entity.setUserId(userId);
         entity.setTitle(request.getTitle() == null ? "" : request.getTitle());
         entity.setExplain(request.getExplain() == null ? "" : request.getExplain());
 
@@ -52,56 +55,61 @@ public class TaskService {
         entity.setIsCompleted(false);
         entity.setIsDeleted(false);
 
-         entity.setDate(System.currentTimeMillis());
+        // Şu an sen hep "now" basıyorsun:
+        entity.setDate(System.currentTimeMillis());
+
+        TaskEntity saved = taskRepository.save(entity);
+        return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TaskResponse> listByUser(Long userId, boolean includeDeleted) {
+        List<TaskEntity> list = includeDeleted
+                ? taskRepository.findAllByUserId(userId)
+                : taskRepository.findActiveTasks(userId);
+
+        return list.stream().map(this::toResponse).toList();
+    }
+
+    public TaskResponse update(Long userId, String taskId, TaskUpdateRequest request) {
+        TaskEntity entity = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+
+        // OWNERSHIP CHECK
+        if (entity.getUserId() == null || !entity.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu task sana ait değil.");
+        }
+
+        if (request.getTitle() != null) entity.setTitle(request.getTitle());
+        if (request.getExplain() != null) entity.setExplain(request.getExplain());
+        if (request.getIsCompleted() != null) entity.setIsCompleted(request.getIsCompleted());
+        if (request.getStartDate() != null) entity.setStartDate(request.getStartDate());
+        if (request.getEndDate() != null) entity.setEndDate(request.getEndDate());
+        if (request.getDate() != null) entity.setDate(request.getDate());
+
+        if (request.getVersion() != null) {
+            entity.setVersion(request.getVersion());
+        }
 
         TaskEntity saved = taskRepository.save(entity);
         return toResponse(saved);
     }
 
 
-    @Transactional(readOnly = true)
-    public List<TaskResponse> listByUser(Long userId, boolean includeDeleted) {
-        List<TaskEntity> list = includeDeleted
-                ? taskRepository.findAllByUserId(userId)
-                : taskRepository.findActiveTasks(userId); // ✅ null/false güvenli
-
-        return list.stream().map(this::toResponse).toList();
-    }
-
-    public TaskResponse update(String taskId, TaskUpdateRequest request) {
+    public void softDelete(Long userId, String taskId) {
         TaskEntity entity = taskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
 
-        // Patch update: null geleni değiştirmiyoruz
-        if (request.getTitle() != null) entity.setTitle(request.getTitle());
-        if (request.getExplain() != null) entity.setExplain(request.getExplain());
 
-        if (request.getIsCompleted() != null) entity.setIsCompleted(request.getIsCompleted());
-
-
-        if (request.getStartDate() != null) entity.setStartDate(request.getStartDate());
-        if (request.getEndDate() != null) entity.setEndDate(request.getEndDate());
-        if (request.getDate() != null) entity.setDate(request.getDate());
-
-        // Orta yol: version otomatik artmıyor.
-
-        if (request.getVersion() != null) {
-            entity.setVersion(request.getVersion());
+        if (entity.getUserId() == null || !entity.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu task sana ait değil.");
         }
-
-        TaskEntity saved = taskRepository.save(entity); // @PreUpdate updatedTime günceller
-        return toResponse(saved);
-    }
-
-    public void softDelete(String taskId) {
-        TaskEntity entity = taskRepository.findById(taskId)
-                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
 
         entity.setIsDeleted(true);
         taskRepository.save(entity);
     }
 
-    // ---- Mapper ----
+
     private TaskResponse toResponse(TaskEntity e) {
         TaskResponse r = new TaskResponse();
         r.setId(e.getId());
