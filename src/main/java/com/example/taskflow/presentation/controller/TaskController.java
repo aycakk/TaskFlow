@@ -58,6 +58,13 @@ public class TaskController {
         return taskService.listByUser(userId, includeDeleted);
     }
 
+    @GetMapping("/{id}")
+    public TaskResponse getById(@PathVariable String id) {
+        Long userId = currentUserId();
+        return taskService.getById(userId, id);
+    }
+
+
     @GetMapping("/paged")
     public Page<TaskResponse> listPaged(
             @RequestParam(defaultValue = "false") boolean includeDeleted,

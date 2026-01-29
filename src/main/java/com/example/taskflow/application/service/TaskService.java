@@ -128,4 +128,23 @@ public class TaskService {
         r.setDummyField(e.getDummyField());
         return r;
     }
+
+    @Transactional(readOnly = true)
+    public TaskResponse getById(Long userId, String taskId) {
+        TaskEntity entity = taskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
+
+        // ✅ OWNERSHIP CHECK
+        if (entity.getUserId() == null || !entity.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bu task sana ait değil.");
+        }
+
+        // Soft delete edilmişse göstermeyelim (istersen bunu opsiyonlu yaparız)
+        if (Boolean.TRUE.equals(entity.getIsDeleted())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found: " + taskId);
+        }
+
+        return toResponse(entity);
+    }
+
 }

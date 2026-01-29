@@ -1,5 +1,6 @@
 package com.example.taskflow.security;
 
+import com.example.taskflow.application.service.AuthService;
 import com.example.taskflow.infrastructure.persistence.entity.UserEntity;
 import com.example.taskflow.infrastructure.persistence.repository.UserRepository;
 import com.example.taskflow.security.dto.AuthResponse;
@@ -21,15 +22,18 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationProvider authenticationProvider;
     private final JwtService jwtService;
+    private final AuthService authService;
 
     public AuthController(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           AuthenticationProvider authenticationProvider,
-                          JwtService jwtService) {
+                          JwtService jwtService,
+                          AuthService authService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationProvider = authenticationProvider;
         this.jwtService = jwtService;
+        this.authService=authService;
     }
 
     @PostMapping("/register")
@@ -50,7 +54,7 @@ public class AuthController {
         user.setUsername(req.getUsername());
         user.setPassword(passwordEncoder.encode(req.getPassword())); // ✅ hash
 
-        userRepository.save(user);
+        authService.register(req);
     }
 
     @PostMapping("/login")
